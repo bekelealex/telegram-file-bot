@@ -1,4 +1,4 @@
-# FAST ASYNC STORAGE BOT (FINAL CLEAN VERSION)
+# FAST ASYNC STORAGE BOT (FINAL PRODUCTION VERSION)
 
 import os
 import logging
@@ -188,23 +188,30 @@ async def error_handler(update, context):
 
 # ---------------- MAIN ----------------
 def main():
-    # Initialize DB before starting bot
+    # Run DB init safely
     asyncio.run(init_db())
 
+    # Build bot
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("mystats", mystats))
     app.add_handler(CommandHandler("search", search))
 
+    # File handlers
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.AUDIO, handle_audio))
 
+    # Error handler
     app.add_error_handler(error_handler)
 
     print("Bot running...")
+
+    # Start bot (correct way)
     app.run_polling()
 
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     main()
