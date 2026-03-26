@@ -1,4 +1,5 @@
-# FAST ASYNC STORAGE BOT (PRODUCTION LEVEL)
+# FAST ASYNC STORAGE BOT (FIXED VERSION)
+
 import os
 import logging
 import asyncio
@@ -9,16 +10,20 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     ContextTypes, filters
 )
+
+# ---------------- CONFIG ----------------
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 8369307958
 
+if not TOKEN:
+    raise ValueError("❌ TOKEN is missing! Set it in Render Environment Variables")
+
 logging.basicConfig(level=logging.INFO)
 
-# FOLDERS
+# ---------------- FOLDERS ----------------
 os.makedirs("downloads/audio", exist_ok=True)
 os.makedirs("downloads/documents", exist_ok=True)
 os.makedirs("downloads/images", exist_ok=True)
-
 
 # ---------------- DATABASE ----------------
 async def init_db():
@@ -43,7 +48,6 @@ async def init_db():
         """)
         await db.commit()
 
-
 async def save_user(user_id, name):
     async with aiosqlite.connect("bot.db") as db:
         await db.execute(
@@ -51,7 +55,6 @@ async def save_user(user_id, name):
             (user_id, name)
         )
         await db.commit()
-
 
 async def save_file(user_id, file_name, file_type, file_size, tag):
     async with aiosqlite.connect("bot.db") as db:
@@ -65,19 +68,22 @@ async def save_file(user_id, file_name, file_type, file_size, tag):
         ))
         await db.commit()
 
-
 # ---------------- COMMANDS ----------------
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+
     await save_user(update.effective_user.id, update.effective_user.first_name)
 
     await update.message.reply_text(
         "Welcome!\n\nSend files with caption (tag)\n\n"
-        "Commands:\n/search keyword\n/mystats\n/delete filename"
+        "Commands:\n/search keyword\n/mystats"
     )
 
-
 async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+
     async with aiosqlite.connect("bot.db") as db:
         async with db.execute(
             "SELECT COUNT(*) FROM files WHERE user_id=?",
@@ -87,8 +93,10 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"You uploaded {count} files")
 
-
 async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+
     keyword = " ".join(context.args).lower()
 
     async with aiosqlite.connect("bot.db") as db:
@@ -105,31 +113,35 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("No results found")
 
-
 # ---------------- FILE HANDLERS ----------------
-
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.document:
+        return
+
     doc = update.message.document
     caption = update.message.caption or "general"
     tag = caption.split()[0].lower()
 
     file = await doc.get_file()
-    file_path = f"downloads/documents/{doc.file_name}"
+    file_name = doc.file_name or f"{doc.file_id}.dat"
+    file_path = f"downloads/documents/{file_name}"
 
     await file.download_to_drive(file_path)
 
     await save_file(
         update.effective_user.id,
-        doc.file_name,
+        file_name,
         "document",
         doc.file_size,
         tag
     )
 
-    await update.message.reply_text(f"Saved: {doc.file_name}")
-
+    await update.message.reply_text(f"Saved: {file_name}")
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.photo:
+        return
+
     photo = update.message.photo[-1]
     file = await photo.get_file()
 
@@ -148,8 +160,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("Image saved")
 
-
 async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.audio:
+        return
+
     audio = update.message.audio
     file = await audio.get_file()
 
@@ -168,9 +182,11 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("Audio saved")
 
+# ---------------- ERROR HANDLER ----------------
+async def error_handler(update, context):
+    logging.error(f"Update {update} caused error {context.error}")
 
 # ---------------- MAIN ----------------
-
 async def main():
     await init_db()
 
@@ -184,9 +200,10 @@ async def main():
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.AUDIO, handle_audio))
 
+    app.add_error_handler(error_handler)
+
     print("Bot running...")
     await app.run_polling()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
