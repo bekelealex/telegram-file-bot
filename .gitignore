@@ -2,3 +2,5 @@
 bot.db
 downloads/
 **pycache**/
+*.pyc
+
