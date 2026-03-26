@@ -1,4 +1,4 @@
-# FAST ASYNC STORAGE BOT (FIXED VERSION)
+# FAST ASYNC STORAGE BOT (FINAL CLEAN VERSION)
 
 import os
 import logging
@@ -187,8 +187,9 @@ async def error_handler(update, context):
     logging.error(f"Update {update} caused error {context.error}")
 
 # ---------------- MAIN ----------------
-async def main():
-    await init_db()
+def main():
+    # Initialize DB before starting bot
+    asyncio.run(init_db())
 
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -203,7 +204,7 @@ async def main():
     app.add_error_handler(error_handler)
 
     print("Bot running...")
-    await app.run_polling()
+    app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
