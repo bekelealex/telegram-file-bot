@@ -1,6 +1,19 @@
+# ---------------- IMPORTS ----------------
+import os
+import logging
+import asyncio
+import aiosqlite
 import threading
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    ContextTypes, filters
+)
+
+# ---------------- WEB SERVER (FOR RENDER PORT) ----------------
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -12,26 +25,14 @@ def run_web():
     server = HTTPServer(("0.0.0.0", port), Handler)
     server.serve_forever()
 
-# Run web server in background
-threading.Thread(target=run_web).start()
-
-import os
-import logging
-import asyncio
-import aiosqlite
-from datetime import datetime
-from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    ContextTypes, filters
-)
+threading.Thread(target=run_web, daemon=True).start()
 
 # ---------------- CONFIG ----------------
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 8369307958
 
 if not TOKEN:
-    raise ValueError("❌ TOKEN is missing! Set it in Render Environment Variables")
+    raise ValueError("❌ TOKEN is missing!")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -119,7 +120,6 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         SELECT file_name, tag FROM files
         WHERE (file_name LIKE ? OR tag LIKE ?) AND user_id=?
         """, (f"%{keyword}%", f"%{keyword}%", update.effective_user.id)) as cursor:
-
             results = await cursor.fetchall()
 
     if results:
@@ -143,13 +143,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await file.download_to_drive(file_path)
 
-    await save_file(
-        update.effective_user.id,
-        file_name,
-        "document",
-        doc.file_size,
-        tag
-    )
+    await save_file(update.effective_user.id, file_name, "document", doc.file_size, tag)
 
     await update.message.reply_text(f"Saved: {file_name}")
 
@@ -165,13 +159,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await file.download_to_drive(file_path)
 
-    await save_file(
-        update.effective_user.id,
-        file_name,
-        "image",
-        photo.file_size,
-        "image"
-    )
+    await save_file(update.effective_user.id, file_name, "image", photo.file_size, "image")
 
     await update.message.reply_text("Image saved")
 
@@ -187,46 +175,39 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await file.download_to_drive(file_path)
 
-    await save_file(
-        update.effective_user.id,
-        file_name,
-        "audio",
-        audio.file_size,
-        "audio"
-    )
+    await save_file(update.effective_user.id, file_name, "audio", audio.file_size, "audio")
 
     await update.message.reply_text("Audio saved")
 
-# ---------------- ERROR HANDLER ----------------
+# ---------------- ERROR ----------------
 async def error_handler(update, context):
-    logging.error(f"Update {update} caused error {context.error}")
+    logging.error(f"Error: {context.error}")
 
-# ---------------- MAIN ----------------
-def main():
-    # Run DB init safely
-    asyncio.run(init_db())
+# ---------------- MAIN (FIXED FOR RENDER) ----------------
+async def main():
+    await init_db()
 
-    # Build bot
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("mystats", mystats))
     app.add_handler(CommandHandler("search", search))
 
-    # File handlers
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.AUDIO, handle_audio))
 
-    # Error handler
     app.add_error_handler(error_handler)
 
-    print("Bot running...")
+    print("✅ Bot is running...")
 
-    # Start bot (correct way)
-    app.run_polling()
+    async with app:
+        await app.start()
+        await app.updater.start_polling()
+
+        while True:
+            await asyncio.sleep(3600)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
