@@ -1,4 +1,5 @@
 # FAST ASYNC STORAGE BOT (PRODUCTION LEVEL)
+import os
 import logging
 import asyncio
 import aiosqlite
@@ -8,10 +9,6 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     ContextTypes, filters
 )
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 8369307958
 
