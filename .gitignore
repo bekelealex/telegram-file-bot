@@ -1,4 +1,4 @@
+.env
 bot.db
 downloads/
-__pycache__/
-.env
+**pycache**/
