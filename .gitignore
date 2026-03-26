@@ -1,0 +1,4 @@
+bot.db
+downloads/
+__pycache__/
+.env
