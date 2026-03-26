@@ -15,8 +15,8 @@ import sqlite3
 from datetime import datetime
 from openpyxl import Workbook
 
-TOKEN = "TOken"
-ADMIN_ID = 'id'
+TOKEN = "TOKEN"
+ADMIN_ID = 8369307958
 
 bot = telebot.TeleBot(TOKEN)
 logging.basicConfig(level=logging.INFO)
